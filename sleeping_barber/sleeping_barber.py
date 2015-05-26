@@ -98,5 +98,3 @@ if __name__ == '__main__':
     create_customer(args.customers, q)
     s.put(POISON_PILL)
     barber.join()
-
-

@@ -8,35 +8,46 @@ import (
 	"time"
 )
 
-func barber(queue, quit chan int) {
-	sleeping := false
-	quitting := false
+type Barber struct {
+	sleeping bool
+	quitting bool
+	queue    chan int
+	quit     chan int
+}
+
+type Client struct {
+	id    int
+	queue chan int
+	wg    *sync.WaitGroup
+}
+
+func (b *Barber) run() {
 	for {
 		select {
-		case <-quit:
-			quitting = true
-		case client := <-queue:
-			fmt.Println("Cutting", client)
+		case <-b.quit:
+			b.quitting = true
+		case id := <-b.queue:
+			fmt.Println("Cutting", id)
 			time.Sleep(time.Duration(rand.Intn(200)) * time.Millisecond)
 		default:
-			if quitting {
+			if b.quitting {
 				return
 			}
-			if !sleeping {
-				sleeping = true
+			if !b.sleeping {
+				b.sleeping = true
 				fmt.Println("Barber is sleeping")
 			}
 		}
 	}
 }
 
-func client(id int, queue chan int, wg *sync.WaitGroup) {
-	defer wg.Done()
+func (c *Client) run() {
+	defer c.wg.Done()
 	time.Sleep(time.Duration(rand.Intn(200)) * time.Millisecond)
 	select {
-	case queue <- id:
+	case c.queue <- c.id:
 	default:
-		fmt.Println("Client", id, "left")
+		fmt.Println("Client", c.id, "left")
 	}
 }
 
@@ -49,11 +60,13 @@ func main() {
 	quit := make(chan int)
 	var wg sync.WaitGroup
 
-	go barber(queue, quit)
+	barber := Barber{false, false, queue, quit}
+	go barber.run()
 
 	wg.Add(*clientsPtr)
 	for i := 0; i < *clientsPtr; i++ {
-		go client(i, queue, &wg)
+		client := Client{i, queue, &wg}
+		go client.run()
 	}
 	wg.Wait()
 	quit <- 0
